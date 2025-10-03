@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCAA D1 Predictor - Today's Games</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">
+                    <span class="title-icon">🏀</span>
+                    NCAA D1 Predictor
+                </h1>
+                <div class="subtitle">Today's Games Analysis</div>
+            </div>
+            
+            {% if snap %}
+                <div class="meta-info">
+                    <div class="date-info">
+                        <span class="label">Date (ET):</span>
+                        <span class="value">{{ snap.etDate }}</span>
+                    </div>
+                    <div class="status-info">
+                        <span class="label">Status:</span>
+                        <span class="status status-{{ snap.status }}">{{ snap.status|upper }}</span>
+                    </div>
+                </div>
+            {% else %}
+                <div class="meta-info">
+                    <div class="no-data">No data available</div>
+                </div>
+            {% endif %}
+            
+            {% if not snap or snap.status != 'ok' %}
+                <div class="alert alert-warning">
+                    <span class="alert-icon">⚠️</span>
+                    <span class="alert-text">No data available today. Sources may have changed or are temporarily unavailable.</span>
+                </div>
+            {% endif %}
+        </header>
+
+        <main class="main">
+            {% if snap and snap.rows %}
+                <div class="table-container">
+                    <table id="predictor-table" class="predictor-table">
+                        <thead>
+                            <tr class="header-row">
+                                <th class="col-time" data-sort="tipoffET">Time (ET)</th>
+                                <th class="col-away" data-sort="awayTeam">Away Team</th>
+                                <th class="col-home" data-sort="homeTeam">Home Team</th>
+                                <th class="col-neutral" data-sort="neutral">Neutral</th>
+                                
+                                <th class="source-header" colspan="3">KenPom</th>
+                                <th class="source-header" colspan="3">BartTorvik</th>
+                                <th class="source-header" colspan="3">Massey</th>
+                                <th class="source-header" colspan="3">Haslametrics</th>
+                                <th class="source-header" colspan="3">Odds</th>
+                                
+                                <th class="col-avg" data-sort="avgSpread">Avg Spread</th>
+                                <th class="col-avg" data-sort="avgTotal">Avg Total</th>
+                                <th class="col-avg" data-sort="avgWinProbHome">Avg Win%</th>
+                            </tr>
+                            <tr class="sub-header">
+                                <th></th><th></th><th></th><th></th>
+                                <th class="metric">Spr</th><th class="metric">Tot</th><th class="metric">WP</th>
+                                <th class="metric">Spr</th><th class="metric">Tot</th><th class="metric">WP</th>
+                                <th class="metric">Spr</th><th class="metric">Tot</th><th class="metric">WP</th>
+                                <th class="metric">Spr</th><th class="metric">Tot</th><th class="metric">WP</th>
+                                <th class="metric">Spr</th><th class="metric">Tot</th><th class="metric">ML</th>
+                                <th></th><th></th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for game in snap.rows %}
+                                <tr class="game-row">
+                                    <td class="time-cell">{{ game.tipoffET or "TBD" }}</td>
+                                    <td class="team-cell away">{{ game.awayTeam }}</td>
+                                    <td class="team-cell home">{{ game.homeTeam }}</td>
+                                    <td class="neutral-cell">
+                                        {% if game.neutral %}
+                                            <span class="neutral-badge">N</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- KenPom -->
+                                    {% set kp = game.kenpom %}
+                                    <td class="metric-cell {{ get_spread_class(kp.spread if kp else None, game.avgSpread, 'kenpom') if kp and kp.spread is not none else '' }}">
+                                        {{ "%.1f"|format(kp.spread) if kp and kp.spread is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_total_class(kp.total if kp else None, game.avgTotal, 'kenpom') if kp and kp.total is not none else '' }}">
+                                        {{ "%.1f"|format(kp.total) if kp and kp.total is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_winprob_class(kp.winProbHome if kp else None, game.avgWinProbHome, 'kenpom') if kp and kp.winProbHome is not none else '' }}">
+                                        {{ "%.1f"|format(kp.winProbHome * 100) if kp and kp.winProbHome is not none else "" }}
+                                    </td>
+                                    
+                                    <!-- BartTorvik -->
+                                    {% set bt = game.bart %}
+                                    <td class="metric-cell {{ get_spread_class(bt.spread if bt else None, game.avgSpread, 'bart') if bt and bt.spread is not none else '' }}">
+                                        {{ "%.1f"|format(bt.spread) if bt and bt.spread is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_total_class(bt.total if bt else None, game.avgTotal, 'bart') if bt and bt.total is not none else '' }}">
+                                        {{ "%.1f"|format(bt.total) if bt and bt.total is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_winprob_class(bt.winProbHome if bt else None, game.avgWinProbHome, 'bart') if bt and bt.winProbHome is not none else '' }}">
+                                        {{ "%.1f"|format(bt.winProbHome * 100) if bt and bt.winProbHome is not none else "" }}
+                                    </td>
+                                    
+                                    <!-- Massey -->
+                                    {% set ms = game.massey %}
+                                    <td class="metric-cell {{ get_spread_class(ms.spread if ms else None, game.avgSpread, 'massey') if ms and ms.spread is not none else '' }}">
+                                        {{ "%.1f"|format(ms.spread) if ms and ms.spread is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_total_class(ms.total if ms else None, game.avgTotal, 'massey') if ms and ms.total is not none else '' }}">
+                                        {{ "%.1f"|format(ms.total) if ms and ms.total is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_winprob_class(ms.winProbHome if ms else None, game.avgWinProbHome, 'massey') if ms and ms.winProbHome is not none else '' }}">
+                                        {{ "%.1f"|format(ms.winProbHome * 100) if ms and ms.winProbHome is not none else "" }}
+                                    </td>
+                                    
+                                    <!-- Haslametrics (showing 2 decimal places for better precision) -->
+                                    {% set hs = game.hasla %}
+                                    <td class="metric-cell {{ get_spread_class(hs.spread if hs else None, game.avgSpread, 'hasla') if hs and hs.spread is not none else '' }}">
+                                        {{ "%.2f"|format(hs.spread) if hs and hs.spread is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_total_class(hs.total if hs else None, game.avgTotal, 'hasla') if hs and hs.total is not none else '' }}">
+                                        {{ "%.2f"|format(hs.total) if hs and hs.total is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_winprob_class(hs.winProbHome if hs else None, game.avgWinProbHome, 'hasla') if hs and hs.winProbHome is not none else '' }}">
+                                        {{ "%.2f"|format(hs.winProbHome * 100) if hs and hs.winProbHome is not none else "" }}
+                                    </td>
+                                    
+                                    <!-- Odds -->
+                                    {% set od = game.odds %}
+                                    <td class="metric-cell {{ get_spread_class(od.spread if od else None, game.avgSpread, 'odds') if od and od.spread is not none else '' }}">
+                                        {{ "%.1f"|format(od.spread) if od and od.spread is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell {{ get_total_class(od.total if od else None, game.avgTotal, 'odds') if od and od.total is not none else '' }}">
+                                        {{ "%.1f"|format(od.total) if od and od.total is not none else "" }}
+                                    </td>
+                                    <td class="metric-cell">
+                                        {% if od and (od.moneylineHome or od.moneylineAway) %}
+                                            {{ od.moneylineHome or "" }}/{{ od.moneylineAway or "" }}
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Averages -->
+                                    <td class="avg-cell">
+                                        {{ "%.1f"|format(game.avgSpread) if game.avgSpread is not none else "" }}
+                                    </td>
+                                    <td class="avg-cell">
+                                        {{ "%.1f"|format(game.avgTotal) if game.avgTotal is not none else "" }}
+                                    </td>
+                                    <td class="avg-cell">
+                                        {{ "%.1f"|format(game.avgWinProbHome * 100) if game.avgWinProbHome is not none else "" }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-item">
+                        <span class="legend-color cell-pos"></span>
+                        <span class="legend-text">🟢 Recommended Bet</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color cell-neg"></span>
+                        <span class="legend-text">🔴 Not Recommended</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color cell-neutral"></span>
+                        <span class="legend-text">⚪ Neutral</span>
+                    </div>
+                </div>
+            {% else %}
+                <div class="no-data">
+                    <div class="no-data-icon">📊</div>
+                    <div class="no-data-text">No games available for today</div>
+                </div>
+            {% endif %}
+        </main>
+        
+        <footer class="footer">
+            <div class="footer-content">
+                <p>Data updated daily at 12:00 PM ET</p>
+                <p>Sources: KenPom, BartTorvik, MasseyRatings, Haslametrics, TeamRankings</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

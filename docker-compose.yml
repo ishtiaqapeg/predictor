@@ -1,0 +1,93 @@
+version: '3.8'
+
+# NCAA D1 Basketball Predictor
+# Production-ready Docker Compose configuration
+
+services:
+  ncaa-predictor:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: ncaa-predictor
+    ports:
+      - "8000:8000"
+    environment:
+      # Data Storage
+      - DATA_BACKEND=${DATA_BACKEND:-local}
+      
+      # AWS Configuration (if using S3)
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_OBJECT_KEY=${S3_OBJECT_KEY:-today.json}
+      
+      # Team List
+      - TEAMLIST_CSV_URL=${TEAMLIST_CSV_URL:-file://data/teams.csv}
+      
+      # KenPom Authentication
+      - KENPOM_EMAIL=${KENPOM_EMAIL}
+      - KENPOM_PASSWORD=${KENPOM_PASSWORD}
+      - KENPOM_COOKIE=${KENPOM_COOKIE}
+      
+      # Admin
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-change-me-to-secure-token}
+      
+      # Scraping
+      - USER_AGENT=${USER_AGENT:-Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36}
+      - HOST_DELAY_MS=${HOST_DELAY_MS:-2000}
+      
+      # Timezone
+      - TZ=America/New_York
+    volumes:
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ncaa-network
+
+  # Optional: Local S3 for development
+  s3-local:
+    image: localstack/localstack:latest
+    container_name: ncaa-s3-local
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=us-east-1
+      - DATA_DIR=/tmp/localstack/data
+      - DEBUG=1
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./localstack-data:/tmp/localstack"
+    networks:
+      - ncaa-network
+    profiles:
+      - s3
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ncaa-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - ncaa-predictor
+    networks:
+      - ncaa-network
+    profiles:
+      - nginx
+
+networks:
+  ncaa-network:
+    driver: bridge
